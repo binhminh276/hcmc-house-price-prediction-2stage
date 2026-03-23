@@ -1,0 +1,14 @@
+# Bỏ qua các file dữ liệu lớn và mô hình
+data/raw/*
+data/processed/*
+models/*
+
+# Bỏ qua môi trường ảo (Virtual Environment)
+venv/
+env/
+.env
+
+# Bỏ qua các file rác của hệ thống và Jupyter
+.ipynb_checkpoints/
+__pycache__/
+.DS_Store
