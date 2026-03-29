@@ -3,15 +3,15 @@ import pandas as pd
 import joblib
 import numpy as np
 
-KMEANS_MODEL_PATH = 'kmeans_model.pkl'
-SCALER_PATH = 'scaler.pkl'
+KMEANS_MODEL_PATH = 'models\\clustering\\kmeans_model.pkl'
+SCALER_PATH = 'models\\clustering\\scaler.pkl'
 
-RF_RAW_PATH = 'rf_pipeline.pkl'
-XGB_RAW_PATH = 'xgb_pipeline.pkl'
-RF_TUNED_PATH = 'best_rf_model.pkl'
-XGB_TUNED_PATH = 'best_xgb_model.pkl'
+RF_RAW_PATH = 'models\\raw_model\\rf_pipeline.pkl'
+XGB_RAW_PATH = 'models\\raw_model\\xgb_pipeline.pkl'
+RF_TUNED_PATH = 'models\\tuned_model\\best_rf_model.pkl'
+XGB_TUNED_PATH = 'models\\tuned_model\\best_xgb_model.pkl'
 
-DATASET_PATH = 'kmeans_clustered_full.csv'
+DATASET_PATH = 'data\\processed\\processed_dataset_cleaned_new.csv'
 
 def load_models():
     try:
