@@ -36,21 +36,32 @@ def cap_nhat_phuong(quan_duoc_chon):
 def feature_engineering(data):
     df_fe = data.copy()
     
-    # Phân khúc diện tích
+    # 1. Phân khúc diện tích
     bins = [0, 30, 120, np.inf]
     labels = ['Duoi_30', 'Tu_30_den_120', 'Tren_120']
     df_fe['Phan_khuc_dien_tich'] = pd.cut(df_fe['Diện tích'], bins=bins, labels=labels)
     
-    # Tỷ lệ WC/Phòng ngủ
+    # 2. Tỷ lệ WC/Phòng ngủ
     df_fe['Ty_le_Bath_Bed'] = df_fe['Số phòng tắm, vệ sinh'] / (df_fe['Số phòng ngủ'] + 1e-5)
     
-    # Loại hình kết hợp Quận
-    df_fe['Loai_hinh_Quan'] = df_fe['Cao tầng'].astype(str) + '_' + df_fe['Quận'].astype(str)
+    # 3. CÁC BIẾN TƯƠNG TÁC KẾT CẤU & VỊ TRÍ
+    df_fe['Mat_tien_Quan'] = df_fe['Mặt tiền'].astype(int).astype(str) + '_' + df_fe['Quận'].astype(str)
+    df_fe['Cao_tang_Quan'] = df_fe['Cao tầng'].astype(int).astype(str) + '_' + df_fe['Quận'].astype(str)
+    df_fe['Mat_tien_Cao_tang'] = df_fe['Mặt tiền'].astype(int).astype(str) + '_' + df_fe['Cao tầng'].astype(int).astype(str)
     
-    # Tổng tiện ích
+    # 4. TIỆN ÍCH (Khu biệt lập & Tổng tiện ích)
+    df_fe['Khu_biet_lap'] = np.where(
+        (df_fe['Gần chợ'] == 0) & (df_fe['Gần trường học'] == 0) & (df_fe['Gần bệnh viện'] == 0), 1, 0
+    )
+    df_fe['Tong_tien_ich'] = df_fe['Gần bệnh viện'] + df_fe['Gần chợ'] + df_fe['Gần trường học']
+    
+    # 5. XỬ LÝ DỮ LIỆU ĐỊNH DANH (Category)
+    if 'Cluster' in df_fe.columns:
+        df_fe['Cluster'] = df_fe['Cluster'].astype(str)
+        
+    # Xóa các biến tiện ích lẻ 
     util_cols = ['Gần bệnh viện', 'Gần chợ', 'Gần trường học']
-    df_fe['Tong_tien_ich'] = df_fe[util_cols].sum(axis=1).astype(str)
-    df_fe = df_fe.drop(columns=util_cols)
+    df_fe = df_fe.drop(columns=[col for col in util_cols if col in df_fe.columns])
     
     return df_fe
 
