@@ -4,12 +4,6 @@ import numpy as np
 import joblib
 import os
 
-centroids = {
-    0: {'Diện tích': 275.22, 'Số phòng ngủ': 6.72, 'Số phòng tắm, vệ sinh': 5.57, 'Mặt tiền': 0.53, 'Gần bệnh viện': 0.09, 'Gần chợ': 0.19, 'Gần trường học': 0.15, 'Cao tầng': 0.75, 'Quy hoạch': 0.05},
-    1: {'Diện tích': 81.92, 'Số phòng ngủ': 3.38, 'Số phòng tắm, vệ sinh': 3.05, 'Mặt tiền': 0.30, 'Gần bệnh viện': 0.15, 'Gần chợ': 0.37, 'Gần trường học': 0.28, 'Cao tầng': 0.64, 'Quy hoạch': 0.05},
-    2: {'Diện tích': 631.34, 'Số phòng ngủ': 19.6, 'Số phòng tắm, vệ sinh': 10.8, 'Mặt tiền': 0.6, 'Gần bệnh viện': 0.11, 'Gần chợ': 0.17, 'Gần trường học': 0.11, 'Cao tầng': 0.91, 'Quy hoạch': 0.0}
-}
-
 quan_phuong_map = {
     "Bình Chánh": ["Thị trấn Tân Túc", "Xã An Phú Tây", "Xã Bình Chánh", "Xã Bình Hưng", "Xã Bình Lợi", "Xã Hưng Long", "Xã Lê Minh Xuân", "Xã Phong Phú", "Xã Phạm Văn Hai", "Xã Qui Đức", "Xã Tân Kiên", "Xã Tân Nhựt", "Xã Tân Quý Tây", "Xã Vĩnh Lộc A", "Xã Vĩnh Lộc B", "Xã Đa Phước"],
     "Bình Thạnh": ["Phường 1", "Phường 11", "Phường 12", "Phường 13", "Phường 14", "Phường 15", "Phường 17", "Phường 19", "Phường 2", "Phường 21", "Phường 22", "Phường 24", "Phường 25", "Phường 26", "Phường 27", "Phường 28", "Phường 3", "Phường 5", "Phường 6", "Phường 7"],
@@ -34,19 +28,6 @@ quan_phuong_map = {
 
 phap_ly_list = ['Sổ riêng', 'Sổ chung', 'Hợp đồng mua bán', 'Đang chờ sổ', 'Vi bằng / uỷ quyền', 'Không rõ']
 noi_that_list = ['Nội thất cơ bản', 'Full nội thất', 'Nội thất cao cấp', 'Không nội thất', 'Không rõ']
-
-def find_nearest_cluster(numeric_features):
-    """Tính khoảng cách Euclidean đến các tâm cụm và trả về cụm gần nhất"""
-    min_dist = float('inf')
-    assigned_cluster = 1
-    for cluster_id, center in centroids.items():
-        dist = 0
-        for col in center.keys():
-            dist += (numeric_features[col] - center[col]) ** 2
-        if dist < min_dist:
-            min_dist = dist
-            assigned_cluster = cluster_id
-    return str(assigned_cluster)
 
 def cap_nhat_phuong(quan_duoc_chon):
     danh_sach_phuong = quan_phuong_map.get(quan_duoc_chon, [])
@@ -81,7 +62,42 @@ def predict_price(model_name, dien_tich_str, so_phong_ngu, so_phong_tam, phap_ly
         dien_tich = float(dt_val)
         if dien_tich <= 0: return "Lỗi", "Diện tích phải > 0"
     except:
-        return "Lỗi định dạng", "Vui lòng nhập diện tích hợp lệ (VD: 26,9)"
+        return "Lỗi định dạng", "Vui lòng nhập diện tích hợp lệ (VD: 26.9)"
+
+    cluster_pipeline_path = "models/classification/xgb_pipeline.pkl"
+    feature_columns_path = "models/classification/feature_columns.pkl"
+    
+    if not os.path.exists(cluster_pipeline_path) or not os.path.exists(feature_columns_path):
+        return "Lỗi", "Không tìm thấy file mô hình phân cụm (xgb_pipeline.pkl / feature_columns.pkl)"
+    
+    try:
+        cluster_pipeline = joblib.load(cluster_pipeline_path)
+        feature_cols = joblib.load(feature_columns_path)
+        
+        # Prepare input data cho Pipeline phân cụm (Loại bỏ Diện tích theo yêu cầu)
+        cluster_input = {
+            'Số phòng ngủ': so_phong_ngu,
+            'Số phòng tắm, vệ sinh': so_phong_tam,
+            'Pháp lý': phap_ly,
+            'Nội thất': noi_that,
+            'Mặt tiền': 1 if mat_tien else 0,
+            'Gần bệnh viện': 1 if gan_bv else 0,
+            'Gần chợ': 1 if gan_cho else 0,
+            'Gần trường học': 1 if gan_th else 0,
+            'Cao tầng': 1 if cao_tang else 0,
+            'Quy hoạch': 1 if quy_hoach else 0,
+            'Phường': phuong,
+            'Quận': quan
+        }
+        
+        df_cluster = pd.DataFrame([cluster_input])
+        df_cluster = df_cluster[feature_cols] # Ensure column order matches training
+        
+        # Dự đoán cụm
+        assigned_cluster = str(int(cluster_pipeline.predict(df_cluster)[0]))
+        
+    except Exception as e:
+        return "Lỗi phân cụm", str(e)
 
     numeric_features = {
         'Diện tích': dien_tich,
@@ -95,8 +111,6 @@ def predict_price(model_name, dien_tich_str, so_phong_ngu, so_phong_tam, phap_ly
         'Quy hoạch': 1 if quy_hoach else 0
     }
     
-    assigned_cluster = find_nearest_cluster(numeric_features)
-
     input_df = pd.DataFrame([{
         **numeric_features,
         'Pháp lý': phap_ly,
@@ -134,7 +148,7 @@ with gr.Blocks(title="Dự đoán Giá Nhà TP.HCM") as demo:
                 quan = gr.Dropdown(choices=list(quan_phuong_map.keys()), label="Quận", value="Quận 1")
                 phuong = gr.Dropdown(choices=quan_phuong_map["Quận 1"], label="Phường", value="Phường Bến Nghé")
             
-            dien_tich = gr.Textbox(label="Diện tích (m²)", value="50,0", placeholder="VD: 26,9")
+            dien_tich = gr.Textbox(label="Diện tích (m²)", value="50.0", placeholder="VD: 26.9")
             
             with gr.Row():
                 so_phong_ngu = gr.Number(label="Số phòng ngủ", value=2, minimum=0)
@@ -156,12 +170,12 @@ with gr.Blocks(title="Dự đoán Giá Nhà TP.HCM") as demo:
     quan.change(fn=cap_nhat_phuong, inputs=quan, outputs=phuong)
 
     gr.Markdown("---")
-    model_name = gr.Radio(choices=["XGBoost", "Random Forest"], label="Chọn Mô Hình Dự Đoán", value="XGBoost")
+    model_name = gr.Radio(choices=["XGBoost", "Random Forest"], label="Chọn Mô Hình Dự Đoán Giá", value="XGBoost")
     btn = gr.Button("DỰ ĐOÁN GIÁ", variant="primary", size="lg")
     
     with gr.Row():
         out_gia_m2 = gr.Textbox(label="Giá dự kiến trên 1m²", text_align="center")
-        out_tong_gia = gr.Textbox(label="Tổng giá trị dự kiến", text_align="center")
+        out_tong_gia = gr.Textbox(label="Tổng giá trị dự kiến & Phân cụm", text_align="center")
 
     btn.click(
         fn=predict_price,
